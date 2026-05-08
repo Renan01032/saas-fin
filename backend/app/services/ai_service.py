@@ -9,16 +9,15 @@ client = OpenAI(api_key=settings.OPENAI_API_KEY)
 SYSTEM_PROMPT = """Você é um assistente financeiro. Extraia dados de gastos de mensagens em português.
 Responda APENAS com JSON válido, sem texto extra, sem markdown.
 Formato obrigatório:
-{
+{{
   "amount": 45.00,
   "category": "alimentação",
   "description": "iFood - pizza",
   "transaction_date": "2024-01-15",
   "confidence": 0.95
-}
+}}
 Categorias válidas: alimentação, transporte, moradia, saúde, lazer, educação, vestuário, outros.
-Se "hoje" → use a data atual. Se não conseguir extrair o valor, use confidence: 0.0.
-Data atual: {today}"""
+Se "hoje" use a data: {today}. Se não conseguir extrair o valor, use confidence: 0.0."""
 
 async def extract_transaction(message: str) -> TransactionExtracted | None:
     try:
