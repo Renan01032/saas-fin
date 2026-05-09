@@ -2,6 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1 import messages, transactions, users
 from app.core.config import settings
+from app.db.database import Base, engine
+
+# Cria as tabelas automaticamente no startup
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="SaaS Fin API",
