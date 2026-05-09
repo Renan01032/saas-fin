@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     DB_USER: str = "root"
     DB_PASSWORD: str = ""
     OPENAI_API_KEY: str = ""
+    GEMINI_API_KEY: str = ""
     JWT_SECRET_KEY: str = "secret"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 15

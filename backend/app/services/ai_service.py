@@ -1,13 +1,14 @@
 import json
 from datetime import date
-from openai import OpenAI
+import google.generativeai as genai
 from app.core.config import settings
 from app.schemas.transaction import TransactionExtracted
 
-client = OpenAI(api_key=settings.OPENAI_API_KEY)
+genai.configure(api_key=settings.GEMINI_API_KEY)
+model = genai.GenerativeModel("gemini-2.0-flash")
 
 SYSTEM_PROMPT = """Você é um assistente financeiro. Extraia dados de gastos de mensagens em português.
-Responda APENAS com JSON válido, sem texto extra, sem markdown.
+Responda APENAS com JSON válido, sem texto extra, sem markdown, sem blocos de código.
 Formato obrigatório:
 {{
   "amount": 45.00,
@@ -17,25 +18,28 @@ Formato obrigatório:
   "confidence": 0.95
 }}
 Categorias válidas: alimentação, transporte, moradia, saúde, lazer, educação, vestuário, outros.
-Se "hoje" use a data: {today}. Se não conseguir extrair o valor, use confidence: 0.0."""
+Se "hoje" use a data: {today}. Se não conseguir extrair o valor, use confidence: 0.0.
+Data atual: {today}"""
 
 async def extract_transaction(message: str) -> TransactionExtracted | None:
     try:
         prompt = SYSTEM_PROMPT.replace("{today}", str(date.today()))
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": message}
-            ],
-            max_tokens=300,
-            temperature=0.1
-        )
-        raw = response.choices[0].message.content.strip()
+        full_prompt = f"{prompt}\n\nMensagem do usuário: {message}"
+        
+        response = model.generate_content(full_prompt)
+        raw = response.text.strip()
+        
+        # Remove possíveis blocos markdown que o Gemini às vezes adiciona
+        raw = raw.replace("```json", "").replace("```", "").strip()
+        
+        print(f"Gemini raw response: {raw}")
+        
         data = json.loads(raw)
         extracted = TransactionExtracted(**data)
+        
         if extracted.confidence < 0.5:
             return None
+            
         return extracted
     except Exception as e:
         print(f"AI extraction error: {e}")
