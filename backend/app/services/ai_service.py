@@ -1,11 +1,14 @@
 import json
 from datetime import date
-import google.generativeai as genai
+from openai import OpenAI
 from app.core.config import settings
 from app.schemas.transaction import TransactionExtracted
 
-genai.configure(api_key=settings.GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-2.0-flash")
+# Groq usa SDK compatível com OpenAI
+client = OpenAI(
+    api_key=settings.GROQ_API_KEY,
+    base_url="https://api.groq.com/openai/v1"
+)
 
 SYSTEM_PROMPT = """Você é um assistente financeiro. Extraia dados de gastos de mensagens em português.
 Responda APENAS com JSON válido, sem texto extra, sem markdown, sem blocos de código.
@@ -24,15 +27,21 @@ Data atual: {today}"""
 async def extract_transaction(message: str) -> TransactionExtracted | None:
     try:
         prompt = SYSTEM_PROMPT.replace("{today}", str(date.today()))
-        full_prompt = f"{prompt}\n\nMensagem do usuário: {message}"
         
-        response = model.generate_content(full_prompt)
-        raw = response.text.strip()
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": message}
+            ],
+            max_tokens=300,
+            temperature=0.1
+        )
         
-        # Remove possíveis blocos markdown que o Gemini às vezes adiciona
+        raw = response.choices[0].message.content.strip()
         raw = raw.replace("```json", "").replace("```", "").strip()
         
-        print(f"Gemini raw response: {raw}")
+        print(f"Groq raw response: {raw}")
         
         data = json.loads(raw)
         extracted = TransactionExtracted(**data)
