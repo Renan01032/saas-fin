@@ -216,8 +216,42 @@ function Login({ onLogin }) {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState({ type: "", text: "" });
 
+  // Máscara para WhatsApp: (99) 99999-9999
+  const handleWppChange = (e) => {
+    let v = e.target.value.replace(/\D/g, ""); // Remove tudo que não é dígito
+    if (v.length > 11) v = v.slice(0, 11); // Limita a 11 dígitos
+    
+    if (v.length > 10) {
+      v = v.replace(/^(\d{2})(\d{5})(\d{4}).*/, "($1) $2-$3");
+    } else if (v.length > 6) {
+      v = v.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, "($1) $2-$3");
+    } else if (v.length > 2) {
+      v = v.replace(/^(\d{2})(\d{0,5}).*/, "($1) $2");
+    } else if (v.length > 0) {
+      v = v.replace(/^(\d*)/, "($1");
+    }
+    setWpp(v);
+  };
+
+  const validate = () => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) return "E-mail inválido.";
+    if (pass.length < 6) return "A senha deve ter pelo menos 6 caracteres.";
+    if (tab === "register") {
+      const cleanWpp = wpp.replace(/\D/g, "");
+      if (cleanWpp.length < 10) return "WhatsApp inválido (DDD + Número).";
+    }
+    return null;
+  };
+
   async function submit(e) {
     e.preventDefault();
+    const error = validate();
+    if (error) {
+      setMsg({ type: "err", text: error });
+      return;
+    }
+
     setLoading(true); setMsg({ type: "", text: "" });
     try {
       if (tab === "login") {
@@ -229,12 +263,17 @@ function Login({ onLogin }) {
         if (r.ok) { onLogin(d.access_token, email); return; }
         setMsg({ type: "err", text: d.detail || "Credenciais inválidas" });
       } else {
+        // Envia apenas os números do WhatsApp para a API
+        const cleanWpp = wpp.replace(/\D/g, "");
         const r = await fetch(`${API_URL}/api/v1/users/register`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password: pass, whatsapp_number: wpp })
+          body: JSON.stringify({ email, password: pass, whatsapp_number: cleanWpp })
         });
         const d = await r.json();
-        if (r.ok) { setMsg({ type: "ok", text: "Conta criada! Faça login." }); setTab("login"); }
+        if (r.ok) { 
+          setMsg({ type: "ok", text: "Conta criada! Faça login." }); 
+          setTab("login"); 
+        }
         else setMsg({ type: "err", text: d.detail || "Erro ao criar conta" });
       }
     } catch { setMsg({ type: "err", text: "Erro de conexão" }); }
@@ -251,7 +290,6 @@ function Login({ onLogin }) {
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: C.bg,
       backgroundImage: `radial-gradient(ellipse at 60% 20%, ${C.purpleDim}44 0%, transparent 60%), radial-gradient(ellipse at 20% 80%, ${C.green}11 0%, transparent 50%)` }}>
       <div className="si" style={{ width: "100%", maxWidth: 400, padding: 24 }}>
-        {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 36 }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
             <SnakeLogo size={44} animate />
@@ -267,7 +305,6 @@ function Login({ onLogin }) {
 
         <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 16, padding: 28,
           boxShadow: `0 0 0 1px ${C.purple}22, 0 32px 64px #00000088` }}>
-          {/* Tabs */}
           <div style={{ display: "flex", background: C.bg, borderRadius: 9, padding: 3, marginBottom: 24 }}>
             {[["login","Entrar"],["register","Criar conta"]].map(([id, label]) => (
               <button key={id} onClick={() => { setTab(id); setMsg({ type:"",text:"" }); }} style={{
@@ -292,8 +329,8 @@ function Login({ onLogin }) {
               {tab === "register" && (
                 <div>
                   <div style={{ fontSize: 11, color: C.textMuted, letterSpacing: ".06em", marginBottom: 6 }}>WHATSAPP</div>
-                  <input type="text" value={wpp} onChange={e => setWpp(e.target.value)}
-                    placeholder="5511999999999" style={inp}
+                  <input type="text" value={wpp} onChange={handleWppChange}
+                    placeholder="(11) 99999-9999" style={inp}
                     onFocus={e => e.target.style.borderColor = C.purple}
                     onBlur={e => e.target.style.borderColor = C.border} />
                 </div>
@@ -301,7 +338,7 @@ function Login({ onLogin }) {
               <div>
                 <div style={{ fontSize: 11, color: C.textMuted, letterSpacing: ".06em", marginBottom: 6 }}>SENHA</div>
                 <input type="password" value={pass} onChange={e => setPass(e.target.value)} required
-                  placeholder="••••••••" style={inp}
+                  placeholder="Mínimo 6 caracteres" style={inp}
                   onFocus={e => e.target.style.borderColor = C.purple}
                   onBlur={e => e.target.style.borderColor = C.border} />
               </div>
@@ -323,9 +360,7 @@ function Login({ onLogin }) {
               opacity: loading ? .7 : 1, cursor: loading ? "not-allowed" : "pointer",
               boxShadow: `0 4px 20px ${C.purple}55`,
               transition: "opacity .15s, transform .12s",
-            }}
-              onMouseEnter={e => { if (!loading) e.target.style.transform = "translateY(-1px)"; }}
-              onMouseLeave={e => e.target.style.transform = "translateY(0)"}>
+            }}>
               {loading ? "Aguarde..." : tab === "login" ? "Entrar →" : "Criar conta →"}
             </button>
           </form>
