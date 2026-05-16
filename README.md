@@ -637,9 +637,9 @@ docker compose down -v --rmi all
 
 ## Informações do Projeto
 
-**Desenvolvido por:** Renan  
-**Curso:** [Nome do curso]  
-**Instituição:** [Nome da instituição]  
+**Desenvolvido por:** Renan Alves, Matheus Domeneghetti, Veronica Neves, Petterson Machado, e Natan Gleison 
+**Curso:** Análise e Desenvolvimento de Sistema 
+**Instituição:** Universidade Cruzeiro do Sul  
 **Ano:** 2026  
 
 **Tecnologias principais:** Python, FastAPI, React, MySQL, Docker, n8n, Groq AI, Evolution API
