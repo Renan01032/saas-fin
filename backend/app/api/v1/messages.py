@@ -12,6 +12,11 @@ router = APIRouter()
 
 @router.post("/process")
 async def process_message(payload: MessagePayload, db: Session = Depends(get_db)):
+    """
+    Endpoint principal para recebimento de webhooks do n8n/WhatsApp.
+    Realiza a validação de segurança, verifica limites e invoca a IA 
+    para processar o gasto enviado pelo usuário.
+    """
     if payload.n8n_secret != settings.N8N_WEBHOOK_SECRET:
         raise HTTPException(status_code=403, detail="Unauthorized")
 

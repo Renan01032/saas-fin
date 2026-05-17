@@ -9,6 +9,10 @@ PLAN_LIMITS = {
 }
 
 def get_or_create_user(db: Session, whatsapp_number: str) -> User:
+    """
+    Gerencia a persistência do usuário: busca um usuário existente pelo 
+    número de WhatsApp ou cria um novo registro caso não exista.
+    """
     user = db.query(User).filter(User.whatsapp_number == whatsapp_number).first()
     if not user:
         user = User(
@@ -22,6 +26,10 @@ def get_or_create_user(db: Session, whatsapp_number: str) -> User:
     return user
 
 def check_plan_limit(db: Session, user: User) -> bool:
+    """
+    Verifica se o usuário atingiu o limite mensal de transações 
+    com base no seu plano (Free, Starter ou Premium).
+    """
     limit = PLAN_LIMITS.get(user.plan)
     if limit is None:
         return True  # ilimitado

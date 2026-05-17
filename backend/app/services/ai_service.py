@@ -25,6 +25,12 @@ Se "hoje" use a data: {today}. Se não conseguir extrair o valor, use confidence
 Data atual: {today}"""
 
 async def extract_transaction(message: str) -> TransactionExtracted | None:
+    """
+    Utiliza o modelo Llama-3.1 via Groq para extrair dados estruturados 
+    de uma mensagem de texto natural em português.
+    Retorna um objeto com valor, categoria, descrição e confiança.
+    """
+
     try:
         prompt = SYSTEM_PROMPT.replace("{today}", str(date.today()))
         

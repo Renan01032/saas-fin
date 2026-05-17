@@ -15,6 +15,10 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 def get_db():
+    """
+    Gerenciador de contexto para sessões do banco de dados SQLAlchemy.
+    Garante que a conexão seja aberta e fechada corretamente a cada requisição.
+    """
     db = SessionLocal()
     try:
         yield db
