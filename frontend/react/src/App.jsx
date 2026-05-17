@@ -220,66 +220,277 @@ function Login({ onLogin }) {
   const [tab, setTab] = useState("login");
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState({ type: "", text: "" });
 
-  const inp = { width: "100%", padding: "11px 14px", borderRadius: 10, background: THEME.bg, border: `1px solid ${THEME.border}`, color: THEME.text, fontSize: 14, outline: "none" };
+  const inp = {
+    width: "100%",
+    padding: "11px 14px",
+    borderRadius: 10,
+    background: THEME.bg,
+    border: `1px solid ${THEME.border}`,
+    color: THEME.text,
+    fontSize: 14,
+    outline: "none"
+  };
+
   const focus = (e) => (e.target.style.borderColor = THEME.purple);
   const blur = (e) => (e.target.style.borderColor = THEME.border);
 
   async function submit(e) {
-    e.preventDefault(); setLoading(true); setMsg({ type: "", text: "" });
+    e.preventDefault();
+    setLoading(true);
+    setMsg({ type: "", text: "" });
+
     try {
       const endpoint = tab === "login" ? "login" : "register";
-      const body = tab === "login"
-        ? { email, password: pass }
-        : { email, password: pass, whatsapp_number: "00000000000" };
-      const r = await fetch(`${API_URL}/api/v1/users/${endpoint}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+      const body =
+        tab === "login"
+          ? {
+              email,
+              password: pass
+            }
+          : {
+              email,
+              password: pass,
+              whatsapp_number: whatsapp
+            };
+
+      const r = await fetch(
+        `${API_URL}/api/v1/users/${endpoint}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(body)
+        }
+      );
+
       const d = await r.json();
+
       if (r.ok) {
-        if (tab === "login") onLogin(d.access_token, email);
-        else { setMsg({ type: "ok", text: "Conta criada! Faça login." }); setTab("login"); }
+        if (tab === "login") {
+          onLogin(d.access_token, email);
+        } else {
+          setMsg({
+            type: "ok",
+            text: "Conta criada! Faça login."
+          });
+
+          setTab("login");
+          setWhatsapp("");
+        }
       } else {
-        setMsg({ type: "err", text: d.detail || "Erro ao processar solicitação" });
+        setMsg({
+          type: "err",
+          text: d.detail || "Erro ao processar solicitação"
+        });
       }
-    } catch { setMsg({ type: "err", text: "Erro de conexão com o servidor" }); }
+    } catch {
+      setMsg({
+        type: "err",
+        text: "Erro de conexão com o servidor"
+      });
+    }
+
     setLoading(false);
   }
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: THEME.bg, backgroundImage: `radial-gradient(ellipse at 60% 20%,${THEME.purpleDim}44 0%,transparent 60%)` }}>
-      <div className="si" style={{ width: "100%", maxWidth: 400, padding: 24 }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: THEME.bg,
+        backgroundImage: `radial-gradient(ellipse at 60% 20%,${THEME.purpleDim}44 0%,transparent 60%)`
+      }}
+    >
+      <div
+        className="si"
+        style={{
+          width: "100%",
+          maxWidth: 400,
+          padding: 24
+        }}
+      >
         <div style={{ textAlign: "center", marginBottom: 36 }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 12,
+              marginBottom: 10
+            }}
+          >
             <SnakeLogo size={44} animate />
+
             <div style={{ textAlign: "left" }}>
-              <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-.03em", lineHeight: 1 }}>
-                Snake<span style={{ color: THEME.green }}>Fin</span>
+              <div
+                style={{
+                  fontSize: 26,
+                  fontWeight: 700,
+                  letterSpacing: "-.03em",
+                  lineHeight: 1
+                }}
+              >
+                Snake
+                <span style={{ color: THEME.green }}>Fin</span>
               </div>
-              <div style={{ fontSize: 11, color: THEME.textMuted, letterSpacing: ".06em" }}>CONTROLE FINANCEIRO</div>
+
+              <div
+                style={{
+                  fontSize: 11,
+                  color: THEME.textMuted,
+                  letterSpacing: ".06em"
+                }}
+              >
+                CONTROLE FINANCEIRO
+              </div>
             </div>
           </div>
-          <p style={{ fontSize: 13, color: THEME.textSub }}>Controle total das suas finanças pessoais</p>
+
+          <p
+            style={{
+              fontSize: 13,
+              color: THEME.textSub
+            }}
+          >
+            Controle total das suas finanças pessoais
+          </p>
         </div>
-        <div style={{ background: THEME.panel, border: `1px solid ${THEME.border}`, borderRadius: 16, padding: 28, boxShadow: `0 0 0 1px ${THEME.purple}22,0 32px 64px #00000088` }}>
-          <div style={{ display: "flex", background: THEME.bg, borderRadius: 9, padding: 3, marginBottom: 24 }}>
-            {[["login", "Entrar"], ["register", "Criar conta"]].map(([id, label]) => (
-              <button key={id} onClick={() => { setTab(id); setMsg({ type: "", text: "" }); }}
-                style={{ flex: 1, padding: "8px 0", border: "none", borderRadius: 7, background: tab === id ? THEME.purple : "transparent", color: tab === id ? "#fff" : THEME.textMuted, fontSize: 13, fontWeight: tab === id ? 600 : 400, transition: "all .2s", cursor: "pointer" }}>
+
+        <div
+          style={{
+            background: THEME.panel,
+            border: `1px solid ${THEME.border}`,
+            borderRadius: 16,
+            padding: 28,
+            boxShadow: `0 0 0 1px ${THEME.purple}22,0 32px 64px #00000088`
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              background: THEME.bg,
+              borderRadius: 9,
+              padding: 3,
+              marginBottom: 24
+            }}
+          >
+            {[
+              ["login", "Entrar"],
+              ["register", "Criar conta"]
+            ].map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => {
+                  setTab(id);
+                  setMsg({ type: "", text: "" });
+                }}
+                style={{
+                  flex: 1,
+                  padding: "8px 0",
+                  border: "none",
+                  borderRadius: 7,
+                  background:
+                    tab === id
+                      ? THEME.purple
+                      : "transparent",
+                  color:
+                    tab === id
+                      ? "#fff"
+                      : THEME.textMuted,
+                  fontSize: 13,
+                  fontWeight: tab === id ? 600 : 400,
+                  transition: "all .2s",
+                  cursor: "pointer"
+                }}
+              >
                 {label}
               </button>
             ))}
           </div>
-          <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+          <form
+            onSubmit={submit}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 14
+            }}
+          >
             <InputField label="EMAIL">
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="seu@email.com" style={inp} onFocus={focus} onBlur={blur} />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="seu@email.com"
+                style={inp}
+                onFocus={focus}
+                onBlur={blur}
+              />
             </InputField>
+
+            {tab === "register" && (
+              <InputField label="TELEFONE">
+                <input
+                  type="text"
+                  value={whatsapp}
+                  onChange={(e) => setWhatsapp(e.target.value)}
+                  required
+                  placeholder="11999999999"
+                  style={inp}
+                  onFocus={focus}
+                  onBlur={blur}
+                />
+              </InputField>
+            )}
+
             <InputField label="SENHA">
-              <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} required placeholder="••••••••" style={inp} onFocus={focus} onBlur={blur} />
+              <input
+                type="password"
+                value={pass}
+                onChange={(e) => setPass(e.target.value)}
+                required
+                placeholder="••••••••"
+                style={inp}
+                onFocus={focus}
+                onBlur={blur}
+              />
             </InputField>
+
             <Alert type={msg.type} text={msg.text} />
-            <button type="submit" disabled={loading} style={{ padding: "13px 0", border: "none", borderRadius: 10, background: `linear-gradient(135deg,${THEME.purple},${THEME.purpleHi})`, color: "#fff", fontSize: 15, fontWeight: 600, opacity: loading ? 0.7 : 1, cursor: loading ? "not-allowed" : "pointer", boxShadow: `0 4px 20px ${THEME.purple}55`, marginTop: 4 }}>
-              {loading ? "Aguarde..." : tab === "login" ? "Entrar →" : "Criar conta →"}
+
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                padding: "13px 0",
+                border: "none",
+                borderRadius: 10,
+                background: `linear-gradient(135deg,${THEME.purple},${THEME.purpleHi})`,
+                color: "#fff",
+                fontSize: 15,
+                fontWeight: 600,
+                opacity: loading ? 0.7 : 1,
+                cursor: loading
+                  ? "not-allowed"
+                  : "pointer",
+                boxShadow: `0 4px 20px ${THEME.purple}55`,
+                marginTop: 4
+              }}
+            >
+              {loading
+                ? "Aguarde..."
+                : tab === "login"
+                ? "Entrar →"
+                : "Criar conta →"}
             </button>
           </form>
         </div>
