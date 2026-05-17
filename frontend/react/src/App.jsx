@@ -31,6 +31,30 @@ const CAT_COLOR = {
 
 const CATEGORIES = ["alimentação","transporte","moradia","saúde","lazer","educação","vestuário","outros"];
 
+const CATEGORY_KEYWORDS = {
+  "alimentação": ["ifood","rappi","uber eats","mercado","supermercado","padaria","restaurante","lanche","pizza","hamburguer","açougue","feira","comida","almoço","jantar","café","cafeteria","hortifruti","refeição","sushi","delivery","mcdonalds","subway","burguer","churrasco","bebida","bar","boteco","sorvete","doceria"],
+  "transporte": ["uber","99","cabify","taxi","ônibus","metro","metrô","trem","combustivel","gasolina","etanol","diesel","estacionamento","pedágio","pedgio","multa","ipva","dpvat","manutenção carro","oficina","borracharia","auto","motocicleta","moto","bicicleta","patinete","passagem","bilhete único","ônibus"],
+  "moradia": ["aluguel","condominio","condomínio","luz","energia","agua","gás","gas","internet","telefone","tv","streaming","netflix","spotify","amazon","disney","hbo","celular","conta","fatura","iptu","reforma","pintura","encanador","eletricista","móveis","moveis","decoração","ikea","leroy","tok stok"],
+  "saúde": ["remedio","remédio","farmácia","farmacia","droga","medicat","ultrafarma","panvel","drogasil","hospital","clinica","médico","medico","consulta","exame","dentista","ortopedista","psicólogo","psicologo","terapia","academia","gym","smartfit","bodytech","plano de saude","plano saude","unimed","amil","bradesco saude","suplemento","vitamina","whey"],
+  "lazer": ["cinema","teatro","show","ingresso","ticketmaster","sympla","netflix","spotify","jogo","game","steam","playstation","xbox","viagem","hotel","airbnb","booking","passagem aérea","passagem aerea","latam","gol","azul","parque","disney","universal","passeio","bar","balada","festa"],
+  "educação": ["escola","faculdade","universidade","curso","udemy","alura","coursera","livro","livraria","amazon livro","material escolar","papelaria","mensalidade","boleto escola","ingles","inglês","idioma","certificado","treinamento"],
+  "vestuário": ["roupa","roupas","vestuario","vestuário","calçado","calcado","sapato","tenis","tênis","camisa","calça","calca","vestido","shorts","bermuda","meia","cueca","sutiã","jaqueta","casaco","zara","hm","renner","riachuelo","c&a","shein","amaro","nike","adidas","adidas","farm","animale","arezzo","luiza barcelos"],
+  "outros": []
+};
+
+function detectCategory(description) {
+  if (!description || description.length < 2) return null;
+  const desc = description.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+  for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (cat === "outros") continue;
+    for (const kw of keywords) {
+      const kwNorm = kw.normalize("NFD").replace(/[̀-ͯ]/g,"");
+      if (desc.includes(kwNorm)) return cat;
+    }
+  }
+  return null;
+}
+
 function cc(cat) { return CAT_COLOR[cat] || "#78909c"; }
 function fmt(n) { return `R$${Number(n).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})}`; }
 function fmtShort(n) { n=Number(n); return n>=1000?`R$${(n/1000).toFixed(1)}k`:`R$${n.toFixed(0)}`; }
@@ -682,8 +706,37 @@ function NewTxPage({ onSaved }) {
   const [form,setForm]=useState({amount:"",description:"",category:"alimentação",date:todayStr()});
   const [loading,setLoading]=useState(false);
   const [msg,setMsg]=useState({type:"",text:""});
+  const [catDetected,setCatDetected]=useState(null);
 
   function set(k,v){setForm(f=>({...f,[k]:v}));}
+
+  function handleDescriptionChange(e) {
+    const desc = e.target.value;
+    const detected = detectCategory(desc);
+    setForm(f => ({
+      ...f,
+      description: desc,
+      ...(detected ? {category: detected} : {})
+    }));
+    if (detected) {
+      setCatDetected(detected);
+    } else {
+      setCatDetected(null);
+    }
+  }
+
+  // Formatar valor: 12045 → 120.45
+  function handleAmountChange(e) {
+    const raw = e.target.value.replace(/[^\d]/g,"");
+    if (!raw) { set("amount",""); return; }
+    const num = (parseInt(raw,10)/100).toFixed(2);
+    set("amount", num);
+  }
+
+  function displayAmount(val) {
+    if (!val) return "";
+    return Number(val).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -694,30 +747,45 @@ function NewTxPage({ onSaved }) {
       const token=localStorage.getItem("sf_token")||"";
       let userId="";
       try {
-        const payload=JSON.parse(atob(token.split(".")[1]));
-        userId=payload.sub||"";
-      } catch {}
+        const parts=token.split(".");
+        if(parts.length===3){
+          const payload=JSON.parse(atob(parts[1].replace(/-/g,"+").replace(/_/g,"/")));
+          userId=payload.sub||"";
+        }
+      } catch(err){ console.error("JWT decode error:",err); }
 
-      // Salvar direto sem IA (usuário já escolheu categoria)
+      if(!userId){ setMsg({type:"err",text:"Sessão expirada. Faça login novamente."}); setLoading(false); return; }
+
+      const selectedCategory=form.category;
+      const amountVal=parseFloat(form.amount);
+
+      console.log("Salvando:", {userId,amountVal,selectedCategory,description:form.description});
+
       const r=await fetch(`${API_URL}/api/v1/transactions/`,{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
           user_id:userId,
-          amount:parseFloat(form.amount),
-          category:form.category,
+          amount:amountVal,
+          category:selectedCategory,
           description:form.description,
           transaction_date:form.date,
           source:"dashboard"
         })
       });
       const d=await r.json();
+      console.log("Resposta:", d);
       if (d.action==="saved"){
-        setMsg({type:"ok",text:`✓ Lançamento salvo! ${fmt(form.amount)} em ${form.category}`});
+        setMsg({type:"ok",text:`✓ Salvo! ${fmt(amountVal)} em ${selectedCategory}`});
         setForm({amount:"",description:"",category:"alimentação",date:todayStr()});
         onSaved();
-      } else setMsg({type:"err",text:"Erro ao salvar. Verifique os dados."});
-    } catch { setMsg({type:"err",text:"Erro de conexão com o servidor"}); }
+      } else {
+        setMsg({type:"err",text:JSON.stringify(d)});
+      }
+    } catch(err) {
+      console.error(err);
+      setMsg({type:"err",text:"Erro de conexão com o servidor"});
+    }
     setLoading(false);
   }
 
@@ -736,18 +804,26 @@ function NewTxPage({ onSaved }) {
         style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:24,display:"flex",flexDirection:"column",gap:18}}>
         <div>
           <div style={{fontSize:11,color:C.textMuted,letterSpacing:".06em",marginBottom:8}}>VALOR (R$)</div>
-          <input type="number" value={form.amount} onChange={e=>set("amount",e.target.value)}
-            placeholder="0,00" min="0.01" step="0.01" required
+          <input type="text" inputMode="numeric" value={displayAmount(form.amount)}
+            onChange={handleAmountChange}
+            placeholder="0,00" required
             style={{...inp,fontSize:22,fontWeight:700,fontFamily:"'JetBrains Mono'"}}
             onFocus={e=>e.target.style.borderColor=C.purple}
             onBlur={e=>e.target.style.borderColor=C.border}/>
+          <div style={{fontSize:10,color:C.textMuted,marginTop:4}}>Digite apenas os dígitos — a vírgula é inserida automaticamente</div>
         </div>
         <div>
           <div style={{fontSize:11,color:C.textMuted,letterSpacing:".06em",marginBottom:8}}>DESCRIÇÃO</div>
-          <input type="text" value={form.description} onChange={e=>set("description",e.target.value)}
-            placeholder="Ex: almoço, supermercado, farmácia..." required style={inp}
+          <input type="text" value={form.description} onChange={handleDescriptionChange}
+            placeholder="Ex: remédio, mercado, aluguel, uber..." required style={inp}
             onFocus={e=>e.target.style.borderColor=C.purple}
             onBlur={e=>e.target.style.borderColor=C.border}/>
+          {catDetected && (
+            <div style={{fontSize:11,color:C.green,marginTop:5,display:"flex",alignItems:"center",gap:5}}>
+              <span>✦</span>
+              <span>Categoria detectada automaticamente: <strong style={{textTransform:"capitalize"}}>{catDetected}</strong></span>
+            </div>
+          )}
         </div>
         <div>
           <div style={{fontSize:11,color:C.textMuted,letterSpacing:".06em",marginBottom:10}}>CATEGORIA</div>
