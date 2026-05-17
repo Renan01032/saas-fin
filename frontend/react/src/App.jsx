@@ -562,9 +562,11 @@ function BudgetPage({ txs }) {
 }
 
 // ── TRANSAÇÕES ────────────────────────────────────────────────────────────────
-function TransactionsPage({ txs }) {
+function TransactionsPage({ txs, onDelete }) {
   const [search, setSearch] = useState("");
   const [cat, setCat] = useState("todas");
+  const [deleting, setDeleting] = useState(null);
+  const [confirm, setConfirm] = useState(null);
 
   const filtered = useMemo(() => txs.filter((t) =>
     (cat === "todas" || t.category === cat) &&
@@ -572,6 +574,15 @@ function TransactionsPage({ txs }) {
   ), [txs, search, cat]);
 
   const total = filtered.reduce((s, t) => s + Number(t.amount), 0);
+
+  async function handleDelete(id) {
+    setDeleting(id);
+    try {
+      const r = await fetch(`${API_URL}/api/v1/transactions/${id}`, { method: "DELETE" });
+      if (r.ok) { onDelete(); setConfirm(null); }
+    } catch {}
+    setDeleting(null);
+  }
 
   return (
     <div style={{ padding: "20px 24px" }}>
@@ -592,6 +603,34 @@ function TransactionsPage({ txs }) {
           ))}
         </div>
       </div>
+
+      {/* Modal de confirmação */}
+      {confirm && (
+        <div style={{ position: "fixed", inset: 0, background: "#00000088", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
+          onClick={() => setConfirm(null)}>
+          <div style={{ background: THEME.card, border: `1px solid ${THEME.border}`, borderRadius: 16, padding: 28, maxWidth: 340, width: "90%", boxShadow: `0 24px 64px #000000cc` }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Apagar lançamento?</div>
+            <div style={{ fontSize: 13, color: THEME.textSub, marginBottom: 6 }}>
+              <strong>{confirm.description || "Sem descrição"}</strong>
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "'JetBrains Mono'", color: THEME.red, marginBottom: 20 }}>
+              -{fmt(confirm.amount)}
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setConfirm(null)}
+                style={{ flex: 1, padding: "10px 0", border: `1px solid ${THEME.border}`, borderRadius: 9, background: "transparent", color: THEME.textSub, fontSize: 14, cursor: "pointer" }}>
+                Cancelar
+              </button>
+              <button onClick={() => handleDelete(confirm.id)} disabled={deleting === confirm.id}
+                style={{ flex: 1, padding: "10px 0", border: "none", borderRadius: 9, background: THEME.red, color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", opacity: deleting === confirm.id ? 0.6 : 1 }}>
+                {deleting === confirm.id ? "Apagando..." : "Apagar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="fu fu2" style={{ background: THEME.card, border: `1px solid ${THEME.border}`, borderRadius: 14, overflow: "hidden" }}>
         <div style={{ padding: "12px 18px", borderBottom: `1px solid ${THEME.border}`, display: "flex", justifyContent: "space-between" }}>
           <span style={{ fontSize: 12, color: THEME.textMuted }}>{filtered.length} lançamentos</span>
@@ -608,6 +647,12 @@ function TransactionsPage({ txs }) {
             </div>
             <div style={{ fontSize: 12, color: THEME.textMuted }}>{fmtDate(t.transaction_date)}</div>
             <div style={{ fontSize: 13, fontWeight: 600, fontFamily: "'JetBrains Mono'", color: THEME.red, minWidth: 70, textAlign: "right" }}>-{fmt(t.amount)}</div>
+            <button onClick={() => setConfirm(t)} title="Apagar lançamento"
+              style={{ width: 28, height: 28, borderRadius: 7, border: `1px solid ${THEME.border}`, background: "transparent", color: THEME.textMuted, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all .15s" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = `${THEME.red}22`; e.currentTarget.style.color = THEME.red; e.currentTarget.style.borderColor = THEME.red; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = THEME.textMuted; e.currentTarget.style.borderColor = THEME.border; }}>
+              ×
+            </button>
           </div>
         ))}
         {filtered.length === 0 && <div style={{ textAlign: "center", color: THEME.textMuted, padding: 40, fontSize: 13 }}>Nenhum lançamento encontrado</div>}
@@ -736,7 +781,11 @@ export default function App() {
     if (!token) return;
     setLoading(true);
     try {
-      const r = await fetch(`${API_URL}/api/v1/transactions/`, { headers: { Authorization: `Bearer ${token}` } });
+      const userId = decodeUserId(token);
+      const url = userId
+        ? `${API_URL}/api/v1/transactions/?user_id=${userId}`
+        : `${API_URL}/api/v1/transactions/`;
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       if (r.ok) setTxs(await r.json());
       else if (r.status === 401) handleLogout();
     } catch {}
@@ -755,7 +804,7 @@ export default function App() {
         <main style={{ flex: 1, overflowY: "auto" }}>
           {page === "dashboard"    && <DashboardPage txs={txs} loading={loading} />}
           {page === "budget"       && <BudgetPage txs={txs} />}
-          {page === "transactions" && <TransactionsPage txs={txs} />}
+          {page === "transactions" && <TransactionsPage txs={txs} onDelete={load} />}
           {page === "new"          && <NewTxPage onSaved={load} />}
         </main>
       </div>
