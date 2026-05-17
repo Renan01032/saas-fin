@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 
 const API_URL = "http://localhost:8000";
-const INTERNAL_SECRET = "nao-usado";
+const INTERNAL_SECRET = "n8n-interno-saas2024";
 
 // ── TEMA ─────────────────────────────────────────────────────────────────────
 const C = {
@@ -82,12 +82,13 @@ function SnakeLogo({ size=32, animate=false }) {
 }
 
 // ── SPARKLINE ─────────────────────────────────────────────────────────────────
-function Sparkline({ data, color, height=40 }) {
+function Sparkline({ data, color, height=40, width=120 }) {
   if (!data||data.length<2) return <div style={{height}} />;
-  const max=Math.max(...data,1), min=Math.min(...data), range=max-min||1, w=120;
+  const w=width;
+  const max=Math.max(...data,1), min=Math.min(...data), range=max-min||1;
   const pts=data.map((v,i)=>`${(i/(data.length-1))*w},${height-((v-min)/range)*(height-4)-2}`).join(" ");
   return (
-    <svg width={w} height={height} style={{overflow:"visible"}}>
+    <svg width={w} height={height} viewBox={`0 0 ${w} ${height}`} style={{overflow:"visible"}}>
       <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round"/>
       <circle cx={pts.split(" ").pop().split(",")[0]} cy={pts.split(" ").pop().split(",")[1]} r="3" fill={color}/>
     </svg>
@@ -326,7 +327,7 @@ function StatCard({ title, value, sub, sparkData, sparkColor, badge, delay=0 }) 
       <div style={{fontSize:24,fontWeight:700,letterSpacing:"-.02em",marginBottom:6,
         fontFamily:"'JetBrains Mono'",color:C.text}}>{value}</div>
       {sub&&<div style={{fontSize:12,color:C.textSub}}>{sub}</div>}
-      {sparkData&&<div style={{marginTop:12}}><Sparkline data={sparkData} color={sparkColor||C.purple} height={36}/></div>}
+      {sparkData&&<div style={{marginTop:12}}><Sparkline data={sparkData} color={sparkColor||C.purple} height={36} width={120}/></div>}
     </div>
   );
 }
