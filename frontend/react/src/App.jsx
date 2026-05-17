@@ -320,7 +320,7 @@ function Sidebar({ page, setPage, email, onLogout }) {
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
-function DashboardPage({ txs, loading }) {
+function DashboardPage({ txs, loading, onDeleteTx }) {
   const now = new Date();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
 
@@ -438,6 +438,12 @@ function DashboardPage({ txs, loading }) {
                 <div style={{ fontSize: 10, color: THEME.textMuted, marginTop: 2, textTransform: "capitalize" }}>{t.category} · {fmtDate(t.transaction_date)}</div>
               </div>
               <div style={{ fontSize: 13, fontWeight: 600, color: THEME.red, fontFamily: "'JetBrains Mono'", flexShrink: 0 }}>-{fmtShort(t.amount)}</div>
+              <button onClick={() => onDeleteTx(t)} title="Apagar"
+                style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${THEME.border}`, background: "transparent", color: THEME.textMuted, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all .15s" }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = `${THEME.red}22`; e.currentTarget.style.color = THEME.red; e.currentTarget.style.borderColor = THEME.red; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = THEME.textMuted; e.currentTarget.style.borderColor = THEME.border; }}>
+                ×
+              </button>
             </div>
           ))}
           {txs.length === 0 && <div style={{ textAlign: "center", color: THEME.textMuted, fontSize: 12, padding: "24px 0" }}>Nenhum lançamento ainda</div>}
@@ -764,6 +770,8 @@ export default function App() {
   const [page, setPage] = useState("dashboard");
   const [txs, setTxs] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const handleLogin = useCallback((t, e) => {
     setToken(t); setEmail(e);
@@ -794,6 +802,15 @@ export default function App() {
 
   useEffect(() => { load(); }, [load]);
 
+  async function handleDeleteTx(id) {
+    setDeleting(true);
+    try {
+      const r = await fetch(`${API_URL}/api/v1/transactions/${id}`, { method: "DELETE" });
+      if (r.ok) { await load(); setConfirmDelete(null); }
+    } catch {}
+    setDeleting(false);
+  }
+
   if (!token) return <><style>{CSS}</style><Login onLogin={handleLogin} /></>;
 
   return (
@@ -802,12 +819,36 @@ export default function App() {
       <div style={{ display: "flex", height: "100vh", backgroundImage: `radial-gradient(ellipse at 80% 10%,${THEME.purpleDim}33 0%,transparent 50%)` }}>
         <Sidebar page={page} setPage={setPage} email={email} onLogout={handleLogout} />
         <main style={{ flex: 1, overflowY: "auto" }}>
-          {page === "dashboard"    && <DashboardPage txs={txs} loading={loading} />}
+          {page === "dashboard"    && <DashboardPage txs={txs} loading={loading} onDeleteTx={setConfirmDelete} />}
           {page === "budget"       && <BudgetPage txs={txs} />}
           {page === "transactions" && <TransactionsPage txs={txs} onDelete={load} />}
           {page === "new"          && <NewTxPage onSaved={load} />}
         </main>
       </div>
+
+      {/* Modal global de confirmação de delete */}
+      {confirmDelete && (
+        <div style={{ position: "fixed", inset: 0, background: "#00000099", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
+          onClick={() => !deleting && setConfirmDelete(null)}>
+          <div style={{ background: THEME.card, border: `1px solid ${THEME.border}`, borderRadius: 16, padding: 28, maxWidth: 340, width: "90%", boxShadow: "0 24px 64px #000000cc" }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Apagar lançamento?</div>
+            <div style={{ fontSize: 13, color: THEME.textSub, marginBottom: 4 }}>{confirmDelete.description || "Sem descrição"}</div>
+            <div style={{ fontSize: 11, color: THEME.textMuted, textTransform: "capitalize", marginBottom: 16 }}>{confirmDelete.category} · {fmtDate(confirmDelete.transaction_date)}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "'JetBrains Mono'", color: THEME.red, marginBottom: 24 }}>-{fmt(confirmDelete.amount)}</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setConfirmDelete(null)} disabled={deleting}
+                style={{ flex: 1, padding: "10px 0", border: `1px solid ${THEME.border}`, borderRadius: 9, background: "transparent", color: THEME.textSub, fontSize: 14, cursor: "pointer" }}>
+                Cancelar
+              </button>
+              <button onClick={() => handleDeleteTx(confirmDelete.id)} disabled={deleting}
+                style={{ flex: 1, padding: "10px 0", border: "none", borderRadius: 9, background: THEME.red, color: "#fff", fontSize: 14, fontWeight: 600, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.6 : 1 }}>
+                {deleting ? "Apagando..." : "Apagar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

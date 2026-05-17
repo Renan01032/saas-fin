@@ -5,7 +5,6 @@ from pydantic import BaseModel
 from datetime import date
 from app.db.database import get_db
 from app.models.transaction import Transaction
-from app.core.security import verify_token
 
 router = APIRouter()
 
