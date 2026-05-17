@@ -30,7 +30,6 @@ const CAT_COLOR = {
 };
 
 const CATEGORIES = ["alimentação","transporte","moradia","saúde","lazer","educação","vestuário","outros"];
-const BUDGETS = { alimentação:600, transporte:300, moradia:1500, saúde:400, lazer:200, educação:300, vestuário:200, outros:100 };
 
 function cc(cat) { return CAT_COLOR[cat] || "#78909c"; }
 function fmt(n) { return `R$${Number(n).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})}`; }
@@ -473,45 +472,135 @@ function DashboardPage({ txs, loading }) {
 }
 
 // ── ORÇAMENTO ─────────────────────────────────────────────────────────────────
+const DEFAULT_BUDGETS = { alimentação:600,transporte:300,moradia:1500,saúde:400,lazer:200,educação:300,vestuário:200,outros:100 };
+
 function BudgetPage({ txs }) {
+  const [budgets,setBudgets] = useState(()=>{
+    try { return JSON.parse(localStorage.getItem("sf_budgets")||"{}"); } catch { return {}; }
+  });
+  const [editing,setEditing] = useState(null);
+  const [editVal,setEditVal] = useState("");
+
+  function getBudget(cat){ return budgets[cat] ?? DEFAULT_BUDGETS[cat]; }
+
+  function startEdit(cat){
+    setEditing(cat);
+    setEditVal(String(getBudget(cat)));
+  }
+
+  function saveEdit(cat){
+    const val=parseFloat(editVal);
+    if (!isNaN(val) && val>0){
+      const nb={...budgets,[cat]:val};
+      setBudgets(nb);
+      localStorage.setItem("sf_budgets",JSON.stringify(nb));
+    }
+    setEditing(null);
+  }
+
+  // Agrupar transações por categoria com detalhes
+  const catDetails={};
+  txs.forEach(t=>{
+    if(!catDetails[t.category]) catDetails[t.category]=[];
+    catDetails[t.category].push(t);
+  });
+
+  const now=new Date();
+  const thisMoTxs=txs.filter(t=>{
+    const d=new Date(t.transaction_date+"T12:00:00");
+    return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();
+  });
+
   const spent={};
-  txs.forEach(t=>{spent[t.category]=(spent[t.category]||0)+Number(t.amount);});
+  thisMoTxs.forEach(t=>{spent[t.category]=(spent[t.category]||0)+Number(t.amount);});
+
+  const [expanded,setExpanded]=useState(null);
 
   return (
     <div style={{padding:"20px 24px"}}>
-      <div className="fu fu0" style={{marginBottom:24}}>
+      <div className="fu fu0" style={{marginBottom:8}}>
         <div style={{fontSize:11,color:C.textMuted,letterSpacing:".08em",marginBottom:4}}>CONTROLE</div>
         <div style={{fontSize:22,fontWeight:700}}>Orçamento Mensal</div>
-        <div style={{fontSize:13,color:C.textSub,marginTop:4}}>Acompanhe seus limites por categoria</div>
+        <div style={{fontSize:13,color:C.textSub,marginTop:4}}>Clique no limite para editar · Clique na categoria para ver detalhes</div>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:12,marginTop:20}}>
         {CATEGORIES.map((cat,i)=>{
           const s=spent[cat]||0;
-          const b=BUDGETS[cat];
+          const b=getBudget(cat);
           const pct=Math.min((s/b)*100,100);
           const over=s>b;
+          const items=catDetails[cat]||[];
+          const isExpanded=expanded===cat;
           return (
-            <div key={cat} className={`card-btn fu fu${i%4}`}
-              style={{background:C.card,border:`1px solid ${over?C.red+"44":C.border}`,borderRadius:14,padding:"16px 18px"}}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}>
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <div style={{width:8,height:8,borderRadius:"50%",background:cc(cat)}}/>
-                  <span style={{fontSize:13,fontWeight:500,textTransform:"capitalize"}}>{cat}</span>
+            <div key={cat} className={`fu fu${i%4}`}
+              style={{background:C.card,border:`1px solid ${over?C.red+"55":isExpanded?C.purple+"55":C.border}`,
+                borderRadius:14,padding:"16px 18px",transition:"border-color .2s",cursor:"default"}}>
+              {/* Header */}
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:12,alignItems:"center"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}
+                  onClick={()=>setExpanded(isExpanded?null:cat)}>
+                  <div style={{width:8,height:8,borderRadius:"50%",background:cc(cat),boxShadow:`0 0 6px ${cc(cat)}`}}/>
+                  <span style={{fontSize:13,fontWeight:600,textTransform:"capitalize"}}>{cat}</span>
+                  {items.length>0&&<span style={{fontSize:10,color:C.textMuted}}>({items.length})</span>}
                 </div>
-                {over&&<span style={{fontSize:10,color:C.red,background:`${C.red}18`,padding:"2px 7px",borderRadius:10,fontWeight:600}}>EXCEDIDO</span>}
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  {over&&<span style={{fontSize:10,color:C.red,background:`${C.red}18`,padding:"2px 7px",borderRadius:10,fontWeight:600}}>EXCEDIDO</span>}
+                  {isExpanded&&<span style={{fontSize:10,color:C.purple}}>▲</span>}
+                  {!isExpanded&&items.length>0&&<span style={{fontSize:10,color:C.textMuted}}>▼</span>}
+                </div>
               </div>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
-                <span style={{fontSize:12,color:C.textSub}}>Gasto</span>
-                <span style={{fontSize:13,fontWeight:600,fontFamily:"'JetBrains Mono'",color:over?C.red:C.text}}>{fmt(s)}</span>
+
+              {/* Valores */}
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:10,alignItems:"center"}}>
+                <div>
+                  <div style={{fontSize:10,color:C.textMuted,marginBottom:2}}>GASTO</div>
+                  <div style={{fontSize:16,fontWeight:700,fontFamily:"'JetBrains Mono'",color:over?C.red:C.text}}>{fmt(s)}</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:10,color:C.textMuted,marginBottom:2}}>LIMITE</div>
+                  {editing===cat?(
+                    <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                      <input autoFocus type="number" value={editVal} onChange={e=>setEditVal(e.target.value)}
+                        onBlur={()=>saveEdit(cat)} onKeyDown={e=>{if(e.key==="Enter")saveEdit(cat);if(e.key==="Escape")setEditing(null);}}
+                        style={{width:80,padding:"2px 6px",borderRadius:6,background:C.bg,border:`1px solid ${C.purple}`,
+                          color:C.text,fontSize:13,fontFamily:"'JetBrains Mono'",outline:"none",textAlign:"right"}}/>
+                      <span style={{fontSize:10,color:C.textMuted}}>✓</span>
+                    </div>
+                  ):(
+                    <div style={{fontSize:16,fontWeight:700,fontFamily:"'JetBrains Mono'",
+                      color:C.textSub,cursor:"pointer",borderBottom:`1px dashed ${C.border}`,paddingBottom:1}}
+                      onClick={()=>startEdit(cat)} title="Clique para editar">
+                      {fmt(b)}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div style={{height:4,background:C.border,borderRadius:2,overflow:"hidden",marginBottom:6}}>
+
+              {/* Barra de progresso */}
+              <div style={{height:5,background:C.border,borderRadius:3,overflow:"hidden",marginBottom:6}}>
                 <div style={{height:"100%",width:`${pct}%`,
                   background:over?C.red:pct>80?C.amber:cc(cat),
-                  borderRadius:2,transition:"width .6s ease"}}/>
+                  borderRadius:3,transition:"width .6s ease"}}/>
               </div>
-              <div style={{fontSize:11,color:C.textMuted,textAlign:"right"}}>
-                {fmt(s)} / {fmt(b)}
+              <div style={{fontSize:10,color:C.textMuted,textAlign:"right",marginBottom: isExpanded&&items.length>0?12:0}}>
+                {Math.round(pct)}% utilizado · restam {fmt(Math.max(b-s,0))}
               </div>
+
+              {/* Detalhes expandidos */}
+              {isExpanded&&items.length>0&&(
+                <div style={{borderTop:`1px solid ${C.border}`,paddingTop:10,display:"flex",flexDirection:"column",gap:6}}>
+                  {items.sort((a,b)=>new Date(b.transaction_date)-new Date(a.transaction_date)).slice(0,5).map((t,j)=>(
+                    <div key={j} style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div>
+                        <div style={{fontSize:12,color:C.text,fontWeight:500}}>{t.description||"—"}</div>
+                        <div style={{fontSize:10,color:C.textMuted}}>{new Date(t.transaction_date+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})}</div>
+                      </div>
+                      <div style={{fontSize:12,fontWeight:600,color:C.red,fontFamily:"'JetBrains Mono'"}}>{fmt(t.amount)}</div>
+                    </div>
+                  ))}
+                  {items.length>5&&<div style={{fontSize:10,color:C.textMuted,textAlign:"center"}}>+{items.length-5} mais no histórico</div>}
+                </div>
+              )}
             </div>
           );
         })}
@@ -601,18 +690,34 @@ function NewTxPage({ onSaved }) {
     if (!form.amount||!form.description){setMsg({type:"err",text:"Preencha todos os campos"});return;}
     setLoading(true); setMsg({type:"",text:""});
     try {
-      const text=`Gastei ${form.amount} reais em ${form.description} categoria ${form.category} data ${form.date}`;
-      const r=await fetch(`${API_URL}/api/v1/messages/process`,{
-        method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({phone_number:"dashboard",message_text:text,message_type:"text",n8n_secret:INTERNAL_SECRET})
+      // Decodificar user_id do token JWT
+      const token=localStorage.getItem("sf_token")||"";
+      let userId="";
+      try {
+        const payload=JSON.parse(atob(token.split(".")[1]));
+        userId=payload.sub||"";
+      } catch {}
+
+      // Salvar direto sem IA (usuário já escolheu categoria)
+      const r=await fetch(`${API_URL}/api/v1/transactions/`,{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          user_id:userId,
+          amount:parseFloat(form.amount),
+          category:form.category,
+          description:form.description,
+          transaction_date:form.date,
+          source:"dashboard"
+        })
       });
       const d=await r.json();
       if (d.action==="saved"){
         setMsg({type:"ok",text:`✓ Lançamento salvo! ${fmt(form.amount)} em ${form.category}`});
         setForm({amount:"",description:"",category:"alimentação",date:todayStr()});
         onSaved();
-      } else setMsg({type:"err",text:d.reply||"Erro ao salvar"});
-    } catch { setMsg({type:"err",text:"Erro de conexão"}); }
+      } else setMsg({type:"err",text:"Erro ao salvar. Verifique os dados."});
+    } catch { setMsg({type:"err",text:"Erro de conexão com o servidor"}); }
     setLoading(false);
   }
 
