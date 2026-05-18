@@ -160,27 +160,73 @@ function BarChart({ data, height=100 }) {
   );
 }
 
-function Heatmap({ txs }) {
-  const hours=["9h","10h","11h","12h","13h","14h","15h"];
-  const days=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
-  const data=useMemo(()=>Array.from({length:7},(_,hi)=>Array.from({length:7},(_,di)=>{
-    const d=new Date(); d.setDate(d.getDate()-(6-di));
-    return txs.filter(t=>t.transaction_date===d.toISOString().split("T")[0]).length>0?Math.random()*3:0;
-  })),[txs]);
-  const max=Math.max(...data.flat(),1);
+function WeekChart({ txs }) {
+  const DAYS = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+
+  const data = useMemo(() => {
+    const totals = Array(7).fill(0);
+    const counts = Array(7).fill(0);
+    txs.forEach(t => {
+      const d = new Date(t.transaction_date + "T12:00:00");
+      const dow = d.getDay();
+      totals[dow] += Number(t.amount);
+      counts[dow]++;
+    });
+    return DAYS.map((label, i) => ({ label, total: totals[i], count: counts[i] }));
+  }, [txs]);
+
+  const max = Math.max(...data.map(d => d.total), 1);
+  const totalGeral = data.reduce((s, d) => s + d.total, 0);
+  const topDay = data.reduce((a, b) => b.total > a.total ? b : a, data[0]);
+
   return (
-    <div style={{overflowX:"auto"}}>
-      <div style={{display:"grid",gridTemplateColumns:"32px repeat(7,1fr)",gap:3,minWidth:240}}>
-        <div/>
-        {days.map(d=><div key={d} style={{fontSize:10,color:T.textMuted,textAlign:"center"}}>{d}</div>)}
-        {hours.map((h,hi)=>[
-          <div key={h} style={{fontSize:10,color:T.textMuted,display:"flex",alignItems:"center"}}>{h}</div>,
-          ...days.map((_,di)=>{
-            const v=data[hi]?.[di]||0;
-            return <div key={di} style={{height:20,borderRadius:3,background:v>0?`rgba(124,58,237,${.15+v/max*.75})`:T.border}}/>;
-          })
-        ])}
-      </div>
+    <div>
+      {totalGeral === 0 ? (
+        <div style={{textAlign:"center",color:T.textMuted,fontSize:12,padding:"32px 0"}}>
+          Nenhum dado ainda — registre gastos para ver o padrão semanal
+        </div>
+      ) : (
+        <>
+          <div style={{display:"flex",gap:16,marginBottom:16,flexWrap:"wrap"}}>
+            <div>
+              <div style={{fontSize:10,color:T.textMuted,marginBottom:2}}>DIA QUE MAIS GASTA</div>
+              <div style={{fontSize:14,fontWeight:600,color:T.purpleHi,textTransform:"capitalize"}}>{topDay.label}</div>
+            </div>
+            <div>
+              <div style={{fontSize:10,color:T.textMuted,marginBottom:2}}>TOTAL NO PERÍODO</div>
+              <div style={{fontSize:14,fontWeight:600}}>{fmt(totalGeral)}</div>
+            </div>
+          </div>
+          <div style={{display:"flex",alignItems:"flex-end",gap:6,height:100}}>
+            {data.map((d, i) => {
+              const pct = (d.total / max) * 84;
+              const isTop = d.label === topDay.label && d.total > 0;
+              return (
+                <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,height:"100%"}}>
+                  <div style={{flex:1,display:"flex",flexDirection:"column",justifyContent:"flex-end",width:"100%",position:"relative"}}
+                    title={d.total > 0 ? `${d.label}: ${fmt(d.total)} (${d.count} lançamento${d.count!==1?"s":""})` : d.label}>
+                    {d.total > 0 && (
+                      <div style={{fontSize:9,color:isTop?T.purpleHi:T.textMuted,textAlign:"center",marginBottom:3,fontFamily:"'JetBrains Mono'",fontWeight:isTop?600:400}}>
+                        {fmtS(d.total)}
+                      </div>
+                    )}
+                    <div style={{
+                      width:"100%",
+                      height: d.total > 0 ? `${Math.max(pct,6)}%` : "3%",
+                      background: isTop
+                        ? `linear-gradient(180deg,${T.purpleHi},${T.purple})`
+                        : d.total > 0 ? `${T.purple}55` : T.border,
+                      borderRadius:"3px 3px 0 0",
+                      transition:"height .5s ease",
+                    }}/>
+                  </div>
+                  <span style={{fontSize:10,color:isTop?T.purpleHi:T.textMuted,fontWeight:isTop?600:400}}>{d.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -213,135 +259,67 @@ function StatCard({ title, value, sub, sparkData, sparkColor, delay=0 }) {
 
 // ── LOGIN ─────────────────────────────────────────────────────────────────────
 function Login({ onLogin }) {
-  const [tab, setTab] = useState("login");
-  const [email, setEmail] = useState("");
-  const [pass, setPass] = useState("");
-  const [whatsapp, setWhatsapp] = useState(""); // Novo estado para o número
-  const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState({ type: "", text: "" });
-  
-  const inp = { width: "100%", padding: "11px 14px", borderRadius: 10, background: T.bg, border: `1px solid ${T.border}`, color: T.text, fontSize: 14, outline: "none" };
-
-  // Função para aplicar máscara (XX) XXXXX-XXXX e limitar tamanho
-  const handleWhatsappChange = (e) => {
-    let value = e.target.value.replace(/\D/g, ""); // Remove tudo que não for número
-    
-    if (value.length > 11) value = value.slice(0, 11); // Limita a 11 dígitos
-    
-    // Aplica a máscara visual
-    let formattedValue = value;
-    if (value.length > 2) {
-      formattedValue = `(${value.slice(0, 2)}) ${value.slice(2)}`;
-    }
-    if (value.length > 7) {
-      formattedValue = `(${value.slice(0, 2)}) ${value.slice(2, 7)}-${value.slice(7)}`;
-    }
-    
-    setWhatsapp(formattedValue);
-  };
+  const [tab,setTab]=useState("login");
+  const [email,setEmail]=useState("");
+  const [pass,setPass]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [msg,setMsg]=useState({type:"",text:""});
+  const inp={width:"100%",padding:"11px 14px",borderRadius:10,background:T.bg,border:`1px solid ${T.border}`,color:T.text,fontSize:14,outline:"none"};
 
   async function submit(e) {
-    e.preventDefault(); 
-    setLoading(true); 
-    setMsg({ type: "", text: "" });
-    
+    e.preventDefault(); setLoading(true); setMsg({type:"",text:""});
     try {
-      // Limpa a máscara antes de enviar para a API (envia apenas números)
-      const rawWhatsapp = whatsapp.replace(/\D/g, "");
-
-      const body = tab === "login" 
-        ? { email, password: pass } 
-        : { email, password: pass, whatsapp_number: rawWhatsapp }; // Utiliza o valor real sanitizado
-        
-      const r = await fetch(`${API_URL}/api/v1/users/${tab === "login" ? "login" : "register"}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
-      
-      const d = await r.json();
-      
+      const body=tab==="login"?{email,password:pass}:{email,password:pass,whatsapp_number:"00000000000"};
+      const r=await fetch(`${API_URL}/api/v1/users/${tab==="login"?"login":"register"}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+      const d=await r.json();
       if (r.ok) {
-        if (tab === "login") {
-          onLogin(d.access_token, email);
-        } else { 
-          setMsg({ type: "ok", text: "Conta criada! Faça login." }); 
-          setTab("login"); 
-          // Limpa os campos após registro
-          setPass("");
-          setWhatsapp("");
-        }
-      } else {
-        setMsg({ type: "err", text: d.detail || "Erro ao processar" });
-      }
-    } catch { 
-      setMsg({ type: "err", text: "Erro de conexão" }); 
-    } finally {
-      setLoading(false);
-    }
+        if (tab==="login") onLogin(d.access_token,email);
+        else { setMsg({type:"ok",text:"Conta criada! Faça login."}); setTab("login"); }
+      } else setMsg({type:"err",text:d.detail||"Erro ao processar"});
+    } catch { setMsg({type:"err",text:"Erro de conexão"}); }
+    setLoading(false);
   }
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: T.bg, backgroundImage: `radial-gradient(ellipse at 60% 20%,${T.purpleDim}44 0%,transparent 60%)` }}>
-      <div className="si" style={{ width: "100%", maxWidth: 400, padding: 24 }}>
-        <div style={{ textAlign: "center", marginBottom: 36 }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-            <SnakeLogo size={44} animate />
-            <div style={{ textAlign: "left" }}>
-              <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-.03em", lineHeight: 1 }}>
-                Snake<span style={{ color: T.green }}>Fin</span>
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:T.bg,
+      backgroundImage:`radial-gradient(ellipse at 60% 20%,${T.purpleDim}44 0%,transparent 60%)`}}>
+      <div className="si" style={{width:"100%",maxWidth:400,padding:24}}>
+        <div style={{textAlign:"center",marginBottom:36}}>
+          <div style={{display:"inline-flex",alignItems:"center",gap:12,marginBottom:10}}>
+            <SnakeLogo size={44} animate/>
+            <div style={{textAlign:"left"}}>
+              <div style={{fontSize:26,fontWeight:700,letterSpacing:"-.03em",lineHeight:1}}>
+                Snake<span style={{color:T.green}}>Fin</span>
               </div>
-              <div style={{ fontSize: 11, color: T.textMuted, letterSpacing: ".06em" }}>CONTROLE FINANCEIRO</div>
+              <div style={{fontSize:11,color:T.textMuted,letterSpacing:".06em"}}>CONTROLE FINANCEIRO</div>
             </div>
           </div>
-          <p style={{ fontSize: 13, color: T.textSub }}>Controle total das suas finanças pessoais</p>
+          <p style={{fontSize:13,color:T.textSub}}>Controle total das suas finanças pessoais</p>
         </div>
-        
-        <div style={{ background: T.panel, border: `1px solid ${T.border}`, borderRadius: 16, padding: 28, boxShadow: `0 0 0 1px ${T.purple}22,0 32px 64px #00000088` }}>
-          <div style={{ display: "flex", background: T.bg, borderRadius: 9, padding: 3, marginBottom: 24 }}>
-            {[["login", "Entrar"], ["register", "Criar conta"]].map(([id, label]) => (
-              <button 
-                key={id} 
-                type="button" // Previne submissão acidental do form
-                onClick={() => { setTab(id); setMsg({ type: "", text: "" }); }}
-                style={{ flex: 1, padding: "8px 0", border: "none", borderRadius: 7, background: tab === id ? T.purple : "transparent", color: tab === id ? "#fff" : T.textMuted, fontSize: 13, fontWeight: tab === id ? 600 : 400, cursor: "pointer", transition: "all .2s" }}>
+        <div style={{background:T.panel,border:`1px solid ${T.border}`,borderRadius:16,padding:28,
+          boxShadow:`0 0 0 1px ${T.purple}22,0 32px 64px #00000088`}}>
+          <div style={{display:"flex",background:T.bg,borderRadius:9,padding:3,marginBottom:24}}>
+            {[["login","Entrar"],["register","Criar conta"]].map(([id,label])=>(
+              <button key={id} onClick={()=>{setTab(id);setMsg({type:"",text:""}); }}
+                style={{flex:1,padding:"8px 0",border:"none",borderRadius:7,background:tab===id?T.purple:"transparent",color:tab===id?"#fff":T.textMuted,fontSize:13,fontWeight:tab===id?600:400,cursor:"pointer",transition:"all .2s"}}>
                 {label}
               </button>
             ))}
           </div>
-          
-          <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div>
-              <Label text="EMAIL" />
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="seu@email.com" style={inp} onFocus={e => e.target.style.borderColor = T.purple} onBlur={e => e.target.style.borderColor = T.border} />
+          <form onSubmit={submit} style={{display:"flex",flexDirection:"column",gap:14}}>
+            <div><Label text="EMAIL"/>
+              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} required placeholder="seu@email.com" style={inp}
+                onFocus={e=>e.target.style.borderColor=T.purple} onBlur={e=>e.target.style.borderColor=T.border}/>
             </div>
-            
-            {/* Renderização condicional do campo de WhatsApp */}
-            {tab === "register" && (
-              <div>
-                <Label text="TELEFONE" />
-                <input 
-                  type="tel" 
-                  value={whatsapp} 
-                  onChange={handleWhatsappChange} 
-                  required={tab === "register"} // Só é required se estiver no cadastro
-                  placeholder="(11) 99999-9999" 
-                  style={inp} 
-                  onFocus={e => e.target.style.borderColor = T.purple} 
-                  onBlur={e => e.target.style.borderColor = T.border} 
-                />
-              </div>
-            )}
-
-            <div>
-              <Label text="SENHA" />
-              <input type="password" value={pass} onChange={e => setPass(e.target.value)} required placeholder="••••••••" minLength={6} style={inp} onFocus={e => e.target.style.borderColor = T.purple} onBlur={e => e.target.style.borderColor = T.border} />
+            <div><Label text="SENHA"/>
+              <input type="password" value={pass} onChange={e=>setPass(e.target.value)} required placeholder="••••••••" style={inp}
+                onFocus={e=>e.target.style.borderColor=T.purple} onBlur={e=>e.target.style.borderColor=T.border}/>
             </div>
-            
-            {msg.text && <Alert type={msg.type} text={msg.text} />}
-            
-            <button type="submit" disabled={loading} style={{ padding: "13px 0", border: "none", borderRadius: 10, background: `linear-gradient(135deg,${T.purple},${T.purpleHi})`, color: "#fff", fontSize: 15, fontWeight: 600, opacity: loading ? .7 : 1, cursor: loading ? "not-allowed" : "pointer", boxShadow: `0 4px 20px ${T.purple}55`, marginTop: 4 }}>
-              {loading ? "Aguarde..." : tab === "login" ? "Entrar →" : "Criar conta →"}
+            <Alert type={msg.type} text={msg.text}/>
+            <button type="submit" disabled={loading} style={{padding:"13px 0",border:"none",borderRadius:10,
+              background:`linear-gradient(135deg,${T.purple},${T.purpleHi})`,color:"#fff",fontSize:15,fontWeight:600,
+              opacity:loading?.7:1,cursor:loading?"not-allowed":"pointer",boxShadow:`0 4px 20px ${T.purple}55`,marginTop:4}}>
+              {loading?"Aguarde...":tab==="login"?"Entrar →":"Criar conta →"}
             </button>
           </form>
         </div>
@@ -478,8 +456,11 @@ function DashboardPage({ txs, loading, colors, onDeleteTx }) {
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
         <div className="card fu fu4" style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:14,padding:"18px 20px"}}>
-          <div style={{fontSize:11,color:T.textMuted,letterSpacing:".06em",marginBottom:14}}>ATIVIDADE SEMANAL</div>
-          <Heatmap txs={txs}/>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <div style={{fontSize:11,color:T.textMuted,letterSpacing:".06em"}}>GASTOS POR DIA DA SEMANA</div>
+            <div style={{fontSize:10,color:T.textMuted}}>histórico completo</div>
+          </div>
+          <WeekChart txs={txs}/>
         </div>
         <div className="card fu fu5" style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:14,padding:"18px 20px"}}>
           <div style={{fontSize:11,color:T.textMuted,letterSpacing:".06em",marginBottom:14}}>LANÇAMENTOS RECENTES</div>
