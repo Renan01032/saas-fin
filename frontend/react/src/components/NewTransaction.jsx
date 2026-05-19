@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { T, fmt, today, cc, detectCat, decodeToken, BASE_CATS, PALETTE, saveCats, norm } from "../constants";
+import { T, fmt, today, cc, detectCat, decodeToken, BASE_CATS, PALETTE, saveCats } from "../constants";
 import { Alert, Label } from "./UI";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -68,7 +68,7 @@ export default function NewTransaction({ onSaved, cats, setCats, colors, setColo
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_id: userId,
-          // Garante que o valor enviado para a API seja sempre negativo (Despesa)
+          // Garante valor estritamente negativo para o banco de dados identificar como despesa
           amount: -Math.abs(parseFloat(form.amount)),
           category: form.category,
           description: form.description,
@@ -77,14 +77,16 @@ export default function NewTransaction({ onSaved, cats, setCats, colors, setColo
         }),
       });
       const d = await r.json();
-      if (d.action === "saved") {
+      if (r.ok) {
         setMsg({ type: "ok", text: `✓ Salvo! ${fmt(form.amount)} em ${form.category}` });
         setForm({ amount: "", description: "", category: cats[0], date: today() });
         setCatDet(null); onSaved();
       } else {
         setMsg({ type: "err", text: d.detail || "Erro ao salvar" });
       }
-    } catch { setMsg({ type: "err", text: "Erro de conexão com o servidor" }); }
+    } catch { 
+      setMsg({ type: "err", text: "Erro de conexão com o servidor" }); 
+    }
     setLoading(false);
   }
 
@@ -150,12 +152,15 @@ export default function NewTransaction({ onSaved, cats, setCats, colors, setColo
             ))}
           </div>
 
-          {!showNewCat ? (
-            <button type="button" onClick={() => setShowNew(true)} style={{
-              fontSize: 11, color: T.purple, background: "transparent",
-              border: `1px dashed ${T.purple}`, borderRadius: 20, padding: "4px 12px", cursor: "pointer",
-            }}>{+ Nova categoria}</button>
-          ) : (
+              {!showNewCat ? (
+                <button 
+                  type="button" 
+                  onClick={() => setShowNew(true)} 
+                  style={{ fontSize: 11, color: T.purple, background: "transparent", border: `1px dashed ${T.purple}`, borderRadius: 20, padding: "4px 12px", cursor: "pointer" }}
+                >
+                  + Nova categoria
+                </button>
+              ) : (
             <div style={{ background: T.bg, borderRadius: 10, padding: 12, border: `1px solid ${T.border}`, display: "flex", flexDirection: "column", gap: 10 }}>
               <input autoFocus value={newCatName} onChange={e => setNewName(e.target.value)}
                 placeholder="nome da categoria" maxLength={20}
