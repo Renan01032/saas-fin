@@ -113,7 +113,7 @@ export default function Login({ onLogin }) {
             {/* Input de telefone visível apenas na aba de Criar Conta */}
             {tab === "register" && (
               <div>
-                <Label text="WHATSAPP" />
+                <Label text="TELEFONE" />
                 <input type="tel" value={whatsapp} onChange={handleWhatsappChange} required={tab === "register"}
                   placeholder="(11) 99999-9999" style={inp}
                   onFocus={e => e.target.style.borderColor = T.purple}
