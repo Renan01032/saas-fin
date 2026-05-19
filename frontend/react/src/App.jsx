@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { CSS, loadCats, decodeToken } from "./constants";
-import { Sidebar, DeleteModal } from "./components/UI";
-import { fmt, fmtD } from "./constants";
-import Login       from "./components/Login";
-import Dashboard   from "./components/Dashboard";
-import Budget      from "./components/Budget";
-import Transactions from "./components/Transactions";
+import { CSS, loadCats, decodeToken, fmt, fmtD } from "./constants";
+import { Sidebar, DeleteModal }  from "./components/UI";
+import Login          from "./components/Login";
+import Dashboard      from "./components/Dashboard";
+import Budget         from "./components/Budget";
+import Transactions   from "./components/Transactions";
 import NewTransaction from "./components/NewTransaction";
+import Income, { loadIncome, saveIncome } from "./components/Income";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -15,7 +15,8 @@ export default function App() {
   const [email, setEmail]   = useState(() => localStorage.getItem("sf_email") || "");
   const [page, setPage]     = useState("dashboard");
   const [txs, setTxs]       = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [income, setIncome] = useState([]);
+  const [loading, setLoading]         = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting]           = useState(false);
   const [cats, setCats]     = useState(() => loadCats().cats);
@@ -33,6 +34,7 @@ export default function App() {
     localStorage.removeItem("sf_email");
   }, []);
 
+  // Carrega transações do backend
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
@@ -42,14 +44,34 @@ export default function App() {
         ? `${API_URL}/api/v1/transactions/?user_id=${userId}`
         : `${API_URL}/api/v1/transactions/`;
       const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      if (r.ok)           setTxs(await r.json());
+      if (r.ok)              setTxs(await r.json());
       else if (r.status === 401) handleLogout();
     } catch {}
     setLoading(false);
   }, [token, handleLogout]);
 
+  // Carrega receitas do localStorage
+  useEffect(() => {
+    if (token) setIncome(loadIncome(token));
+  }, [token]);
+
   useEffect(() => { load(); }, [load]);
 
+  // Adicionar receita
+  function handleAddIncome(entry) {
+    const updated = [entry, ...income];
+    setIncome(updated);
+    saveIncome(token, updated);
+  }
+
+  // Remover receita
+  function handleDeleteIncome(id) {
+    const updated = income.filter(i => i.id !== id);
+    setIncome(updated);
+    saveIncome(token, updated);
+  }
+
+  // Deletar transação
   async function handleDelete() {
     if (!confirmDelete) return;
     setDeleting(true);
@@ -70,9 +92,10 @@ export default function App() {
       <div style={{ display: "flex", height: "100vh" }}>
         <Sidebar page={page} setPage={setPage} email={email} onLogout={handleLogout} />
         <main style={{ flex: 1, overflowY: "auto" }}>
-          {page === "dashboard"    && <Dashboard txs={txs} loading={loading} colors={colors} onDeleteTx={setConfirmDelete} />}
+          {page === "dashboard"    && <Dashboard txs={txs} income={income} loading={loading} colors={colors} onDeleteTx={setConfirmDelete} />}
           {page === "budget"       && <Budget txs={txs} cats={cats} colors={colors} />}
           {page === "transactions" && <Transactions txs={txs} cats={cats} colors={colors} onDeleteTx={setConfirmDelete} />}
+          {page === "income"       && <Income income={income} onSaved={handleAddIncome} onDelete={handleDeleteIncome} />}
           {page === "new"          && <NewTransaction onSaved={load} cats={cats} setCats={setCats} colors={colors} setColors={setColors} />}
         </main>
       </div>

@@ -46,6 +46,7 @@ const NAV = [
   { id: "dashboard",    icon: "⬡", label: "Dashboard" },
   { id: "budget",       icon: "◈", label: "Orçamento" },
   { id: "transactions", icon: "≡", label: "Transações" },
+  { id: "income",       icon: "↑", label: "Receitas" },
   { id: "new",          icon: "+", label: "Novo Lançamento" },
 ];
 

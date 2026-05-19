@@ -3,7 +3,7 @@ import { T, fmt, fmtS, fmtD, cc } from "../constants";
 import { Sparkline, Donut, BarChart, WeekChart } from "./Charts";
 import { StatCard } from "./UI";
 
-export default function Dashboard({ txs, loading, colors, onDeleteTx }) {
+export default function Dashboard({ txs, income = [], loading, colors, onDeleteTx }) {
   const now = new Date();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
 
@@ -14,6 +14,16 @@ export default function Dashboard({ txs, loading, colors, onDeleteTx }) {
 
   const total = thisMo.reduce((s, t) => s + Number(t.amount), 0);
   const maior = thisMo.length ? Math.max(...thisMo.map(t => Number(t.amount))) : 0;
+
+  // Receitas do mês
+  const now2 = new Date();
+  const incomeMo = income.filter(i => {
+    const d = new Date(i.date + "T12:00:00");
+    return d.getMonth() === now2.getMonth() && d.getFullYear() === now2.getFullYear();
+  });
+  const totalIncome = incomeMo.reduce((s, i) => s + Number(i.amount), 0);
+  const balance = totalIncome - total;
+  const hasIncome = totalIncome > 0;
 
   const catMap = useMemo(() => {
     const m = {};
@@ -75,6 +85,31 @@ export default function Dashboard({ txs, loading, colors, onDeleteTx }) {
           {txs.length} transações registradas
         </div>
       </div>
+
+      {/* Balanço mensal — só aparece quando há receita registrada */}
+      {hasIncome && (
+        <div className="fu fu1" style={{ background: balance >= 0 ? `${T.green}12` : `${T.red}12`, border: `1px solid ${balance >= 0 ? T.green : T.red}44`, borderRadius: 14, padding: "14px 20px", display: "flex", gap: 32, flexWrap: "wrap", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 10, color: T.textMuted, letterSpacing: ".08em", marginBottom: 4 }}>RECEITAS DO MÊS</div>
+            <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "'JetBrains Mono'", color: T.green }}>+{fmt(totalIncome)}</div>
+          </div>
+          <div style={{ fontSize: 22, color: T.textMuted }}>−</div>
+          <div>
+            <div style={{ fontSize: 10, color: T.textMuted, letterSpacing: ".08em", marginBottom: 4 }}>GASTOS DO MÊS</div>
+            <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "'JetBrains Mono'", color: T.red }}>-{fmt(total)}</div>
+          </div>
+          <div style={{ fontSize: 22, color: T.textMuted }}>=</div>
+          <div>
+            <div style={{ fontSize: 10, color: T.textMuted, letterSpacing: ".08em", marginBottom: 4 }}>SALDO</div>
+            <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'JetBrains Mono'", color: balance >= 0 ? T.green : T.red }}>
+              {balance >= 0 ? "+" : ""}{fmt(balance)}
+            </div>
+          </div>
+          <div style={{ marginLeft: "auto", fontSize: 12, color: T.textMuted }}>
+            {balance >= 0 ? "✓ Mês positivo" : "⚠ Gastos acima da receita"}
+          </div>
+        </div>
+      )}
 
       {/* Stat cards */}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
