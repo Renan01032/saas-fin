@@ -40,13 +40,25 @@ export default function App() {
     setLoading(true);
     try {
       const userId = decodeToken(token);
+      
+      // CORREÇÃO 1: Removida a barra (/) antes da interrogação para evitar redirecionamento no FastAPI
       const url = userId
-        ? `${API_URL}/api/v1/transactions/?user_id=${userId}`
-        : `${API_URL}/api/v1/transactions/`;
-      const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+        ? `${API_URL}/api/v1/transactions?user_id=${userId}`
+        : `${API_URL}/api/v1/transactions`;
+
+      // CORREÇÃO 2: Header 'ngrok-skip-browser-warning' adicionado para liberar o túnel
+      const r = await fetch(url, { 
+        headers: { 
+          "Authorization": `Bearer ${token}`,
+          "ngrok-skip-browser-warning": "true" 
+        } 
+      });
+      
       if (r.ok)              setTxs(await r.json());
       else if (r.status === 401) handleLogout();
-    } catch {}
+    } catch (err) {
+      console.error("Erro ao carregar transações:", err);
+    }
     setLoading(false);
   }, [token, handleLogout]);
 
@@ -76,9 +88,17 @@ export default function App() {
     if (!confirmDelete) return;
     setDeleting(true);
     try {
-      const r = await fetch(`${API_URL}/api/v1/transactions/${confirmDelete.id}`, { method: "DELETE" });
+      // CORREÇÃO 3: Header do ngrok adicionado na rota de DELETE para evitar falhas em produção
+      const r = await fetch(`${API_URL}/api/v1/transactions/${confirmDelete.id}`, { 
+        method: "DELETE",
+        headers: {
+          "ngrok-skip-browser-warning": "true"
+        }
+      });
       if (r.ok) { await load(); setConfirmDelete(null); }
-    } catch {}
+    } catch (err) {
+      console.error("Erro ao deletar transação:", err);
+    }
     setDeleting(false);
   }
 

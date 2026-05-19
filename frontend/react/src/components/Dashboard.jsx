@@ -14,10 +14,7 @@ export default function Dashboard({ txs = [], income = [], loading, colors, onDe
     return parseInt(month, 10) === (now.getMonth() + 1) && parseInt(year, 10) === now.getFullYear();
   }), [txs]);
 
-  // Usamos Math.abs para converter os valores negativos em somas positivas para os Cards e Gráficos
   const total = thisMo.reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
-  
-  // Encontra o maior gasto tirando o sinal de menos da avaliação
   const maior = thisMo.length ? Math.max(...thisMo.map(t => Math.abs(Number(t.amount)))) : 0;
 
   // Receitas do mês
@@ -31,7 +28,6 @@ export default function Dashboard({ txs = [], income = [], loading, colors, onDe
   const balance = totalIncome - total;
   const hasIncome = totalIncome > 0;
 
-  // Mapeamento por categorias (Forçando valores positivos para o gráfico Donut funcionar)
   const catMap = useMemo(() => {
     const m = {};
     thisMo.forEach(t => { 
@@ -44,19 +40,25 @@ export default function Dashboard({ txs = [], income = [], loading, colors, onDe
     .sort((a, b) => b[1] - a[1])
     .map(([k, v]) => ({ label: k, v, color: cc(k, colors) }));
 
-  // Dados do gráfico de barras dos últimos 14 dias (valores convertidos para positivos)
+  // Correção Sênior: Função para gerar YYYY-MM-DD no fuso horário local (evita bug de UTC à noite)
+  const getLocalDateString = (d) => {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
   const barData = useMemo(() => Array.from({ length: 14 }, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() - (13 - i));
-    const key = d.toISOString().split("T")[0];
+    const d = new Date(); 
+    d.setDate(d.getDate() - (13 - i));
+    const key = getLocalDateString(d); // 👈 Usa a data local protegida contra fuso
     const v = txs.filter(t => t.transaction_date === key).reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
     return { label: d.getDate() % 2 === 0 || i === 13 ? String(d.getDate()) : "", v, today: i === 13 };
   }), [txs]);
 
-  // Dados dos mini-gráficos (Sparklines) das caixas de status
   const spark7 = useMemo(() => Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() - (6 - i));
+    const d = new Date(); 
+    d.setDate(d.getDate() - (6 - i));
+    const key = getLocalDateString(d); // 👈 Usa a data local protegida contra fuso
     return txs
-      .filter(t => t.transaction_date === d.toISOString().split("T")[0])
+      .filter(t => t.transaction_date === key)
       .reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
   }), [txs]);
 
@@ -97,7 +99,7 @@ export default function Dashboard({ txs = [], income = [], loading, colors, onDe
         </div>
       </div>
 
-      {/* Balanço mensal — só aparece quando há receita registrada */}
+      {/* Balanço mensal */}
       {hasIncome && (
         <div className="fu fu1" style={{ background: balance >= 0 ? `${T.green}12` : `${T.red}12`, border: `1px solid ${balance >= 0 ? T.green : T.red}44`, borderRadius: 14, padding: "14px 20px", display: "flex", gap: 32, flexWrap: "wrap", alignItems: "center" }}>
           <div>
@@ -194,7 +196,6 @@ export default function Dashboard({ txs = [], income = [], loading, colors, onDe
                 <div style={{ fontSize: 12, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.description || "—"}</div>
                 <div style={{ fontSize: 10, color: T.textMuted, marginTop: 2, textTransform: "capitalize" }}>{t.category} · {fmtD(t.transaction_date)}</div>
               </div>
-              {/* Exibe o valor de forma limpa na listagem de recentes */}
               <div style={{ fontSize: 13, fontWeight: 600, color: T.red, fontFamily: "'JetBrains Mono'", flexShrink: 0 }}>-{fmtS(Math.abs(t.amount))}</div>
               <DeleteBtn tx={t} />
             </div>
