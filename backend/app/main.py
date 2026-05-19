@@ -7,16 +7,17 @@ from app.db.database import Base, engine
 # Cria as tabelas automaticamente no startup
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(
-    title="SaaS Fin API",
-    version="1.0.0",
-    docs_url="/docs"
-)
+# Defina explicitamente as origens permitidas
+origins = [
+    "https://saas-fin.vercel.app",   # Seu frontend na Vercel
+    "http://localhost:5173",          # Seu ambiente local do Vite
+    "http://localhost:3000",
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=origins,            # Troque o "*" pela lista de origens reais
+    allow_credentials=True,           # Agora sim isso aqui vai funcionar 100% correto
     allow_methods=["*"],
     allow_headers=["*"],
 )
