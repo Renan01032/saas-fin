@@ -68,7 +68,8 @@ export default function NewTransaction({ onSaved, cats, setCats, colors, setColo
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_id: userId,
-          amount: parseFloat(form.amount),
+          // Garante que o valor enviado para a API seja sempre negativo (Despesa)
+          amount: -Math.abs(parseFloat(form.amount)),
           category: form.category,
           description: form.description,
           transaction_date: form.date,
@@ -153,7 +154,7 @@ export default function NewTransaction({ onSaved, cats, setCats, colors, setColo
             <button type="button" onClick={() => setShowNew(true)} style={{
               fontSize: 11, color: T.purple, background: "transparent",
               border: `1px dashed ${T.purple}`, borderRadius: 20, padding: "4px 12px", cursor: "pointer",
-            }}>+ Nova categoria</button>
+            }}>{+ Nova categoria}</button>
           ) : (
             <div style={{ background: T.bg, borderRadius: 10, padding: 12, border: `1px solid ${T.border}`, display: "flex", flexDirection: "column", gap: 10 }}>
               <input autoFocus value={newCatName} onChange={e => setNewName(e.target.value)}
