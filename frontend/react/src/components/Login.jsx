@@ -9,6 +9,7 @@ export default function Login({ onLogin }) {
   const [tab, setTab]       = useState("login");
   const [email, setEmail]   = useState("");
   const [pass, setPass]     = useState("");
+  const [whatsapp, setWhatsapp] = useState(""); // Estado para o número do celular
   const [loading, setLoading] = useState(false);
   const [msg, setMsg]       = useState({ type: "", text: "" });
 
@@ -18,14 +19,30 @@ export default function Login({ onLogin }) {
     color: T.text, fontSize: 14, outline: "none",
   };
 
+  // Função de máscara no formato (XX) XXXXX-XXXX
+  const handleWhatsappChange = (e) => {
+    let value = e.target.value.replace(/\D/g, ""); // Remove letras/símbolos
+    if (value.length > 11) value = value.slice(0, 11); // Limita ao padrão celular BR
+
+    let formatted = value;
+    if (value.length > 2) formatted = `(${value.slice(0, 2)}) ${value.slice(2)}`;
+    if (value.length > 7) formatted = `(${value.slice(0, 2)}) ${value.slice(2, 7)}-${value.slice(7)}`;
+    
+    setWhatsapp(formatted);
+  };
+
   async function submit(e) {
     e.preventDefault();
     setLoading(true);
     setMsg({ type: "", text: "" });
     try {
+      // Remove os parênteses e traço antes de mandar para o banco de dados
+      const cleanWhatsapp = whatsapp.replace(/\D/g, "");
+
       const body = tab === "login"
         ? { email, password: pass }
-        : { email, password: pass, whatsapp_number: "00000000000" };
+        : { email, password: pass, whatsapp_number: cleanWhatsapp };
+
       const r = await fetch(`${API_URL}/api/v1/users/${tab === "login" ? "login" : "register"}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -34,7 +51,12 @@ export default function Login({ onLogin }) {
       const d = await r.json();
       if (r.ok) {
         if (tab === "login") onLogin(d.access_token, email);
-        else { setMsg({ type: "ok", text: "Conta criada! Faça login." }); setTab("login"); }
+        else { 
+          setMsg({ type: "ok", text: "Conta criada! Faça login." }); 
+          setTab("login"); 
+          setPass("");
+          setWhatsapp(""); // Limpa o campo após o cadastro com sucesso
+        }
       } else {
         setMsg({ type: "err", text: d.detail || "Erro ao processar" });
       }
@@ -70,7 +92,7 @@ export default function Login({ onLogin }) {
         }}>
           <div style={{ display: "flex", background: T.bg, borderRadius: 9, padding: 3, marginBottom: 24 }}>
             {[["login", "Entrar"], ["register", "Criar conta"]].map(([id, label]) => (
-              <button key={id} onClick={() => { setTab(id); setMsg({ type: "", text: "" }); }} style={{
+              <button key={id} type="button" onClick={() => { setTab(id); setMsg({ type: "", text: "" }); }} style={{
                 flex: 1, padding: "8px 0", border: "none", borderRadius: 7,
                 background: tab === id ? T.purple : "transparent",
                 color: tab === id ? "#fff" : T.textMuted,
@@ -87,6 +109,18 @@ export default function Login({ onLogin }) {
                 onFocus={e => e.target.style.borderColor = T.purple}
                 onBlur={e => e.target.style.borderColor = T.border} />
             </div>
+
+            {/* Input de telefone visível apenas na aba de Criar Conta */}
+            {tab === "register" && (
+              <div>
+                <Label text="WHATSAPP" />
+                <input type="tel" value={whatsapp} onChange={handleWhatsappChange} required={tab === "register"}
+                  placeholder="(11) 99999-9999" style={inp}
+                  onFocus={e => e.target.style.borderColor = T.purple}
+                  onBlur={e => e.target.style.borderColor = T.border} />
+              </div>
+            )}
+
             <div>
               <Label text="SENHA" />
               <input type="password" value={pass} onChange={e => setPass(e.target.value)} required
@@ -94,7 +128,9 @@ export default function Login({ onLogin }) {
                 onFocus={e => e.target.style.borderColor = T.purple}
                 onBlur={e => e.target.style.borderColor = T.border} />
             </div>
-            <Alert type={msg.type} text={msg.text} />
+            
+            {msg.text && <Alert type={msg.type} text={msg.text} />}
+            
             <button type="submit" disabled={loading} style={{
               padding: "13px 0", border: "none", borderRadius: 10, marginTop: 4,
               background: `linear-gradient(135deg,${T.purple},${T.purpleHi})`,
