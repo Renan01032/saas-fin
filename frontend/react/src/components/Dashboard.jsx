@@ -3,31 +3,40 @@ import { T, fmt, fmtS, fmtD, cc } from "../constants";
 import { Sparkline, Donut, BarChart, WeekChart } from "./Charts";
 import { StatCard } from "./UI";
 
-export default function Dashboard({ txs, income = [], loading, colors, onDeleteTx }) {
+export default function Dashboard({ txs = [], income = [], loading, colors, onDeleteTx }) {
   const now = new Date();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
 
+  // Filtra as transações pertencentes ao mês e ano atuais
   const thisMo = useMemo(() => txs.filter(t => {
-    const d = new Date(t.transaction_date + "T12:00:00");
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    if (!t.transaction_date) return false;
+    const [year, month] = t.transaction_date.split("-");
+    return parseInt(month, 10) === (now.getMonth() + 1) && parseInt(year, 10) === now.getFullYear();
   }), [txs]);
 
-  const total = thisMo.reduce((s, t) => s + Number(t.amount), 0);
-  const maior = thisMo.length ? Math.max(...thisMo.map(t => Number(t.amount))) : 0;
+  // Usamos Math.abs para converter os valores negativos em somas positivas para os Cards e Gráficos
+  const total = thisMo.reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
+  
+  // Encontra o maior gasto tirando o sinal de menos da avaliação
+  const maior = thisMo.length ? Math.max(...thisMo.map(t => Math.abs(Number(t.amount)))) : 0;
 
   // Receitas do mês
-  const now2 = new Date();
   const incomeMo = income.filter(i => {
-    const d = new Date(i.date + "T12:00:00");
-    return d.getMonth() === now2.getMonth() && d.getFullYear() === now2.getFullYear();
+    if (!i.date) return false;
+    const [year, month] = i.date.split("-");
+    return parseInt(month, 10) === (now.getMonth() + 1) && parseInt(year, 10) === now.getFullYear();
   });
-  const totalIncome = incomeMo.reduce((s, i) => s + Number(i.amount), 0);
+  
+  const totalIncome = incomeMo.reduce((s, i) => s + Math.abs(Number(i.amount)), 0);
   const balance = totalIncome - total;
   const hasIncome = totalIncome > 0;
 
+  // Mapeamento por categorias (Forçando valores positivos para o gráfico Donut funcionar)
   const catMap = useMemo(() => {
     const m = {};
-    thisMo.forEach(t => { m[t.category] = (m[t.category] || 0) + Number(t.amount); });
+    thisMo.forEach(t => { 
+      m[t.category] = (m[t.category] || 0) + Math.abs(Number(t.amount)); 
+    });
     return m;
   }, [thisMo]);
 
@@ -35,18 +44,20 @@ export default function Dashboard({ txs, income = [], loading, colors, onDeleteT
     .sort((a, b) => b[1] - a[1])
     .map(([k, v]) => ({ label: k, v, color: cc(k, colors) }));
 
+  // Dados do gráfico de barras dos últimos 14 dias (valores convertidos para positivos)
   const barData = useMemo(() => Array.from({ length: 14 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (13 - i));
     const key = d.toISOString().split("T")[0];
-    const v = txs.filter(t => t.transaction_date === key).reduce((s, t) => s + Number(t.amount), 0);
+    const v = txs.filter(t => t.transaction_date === key).reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
     return { label: d.getDate() % 2 === 0 || i === 13 ? String(d.getDate()) : "", v, today: i === 13 };
   }), [txs]);
 
+  // Dados dos mini-gráficos (Sparklines) das caixas de status
   const spark7 = useMemo(() => Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i));
     return txs
       .filter(t => t.transaction_date === d.toISOString().split("T")[0])
-      .reduce((s, t) => s + Number(t.amount), 0);
+      .reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
   }), [txs]);
 
   if (loading) {
@@ -183,7 +194,8 @@ export default function Dashboard({ txs, income = [], loading, colors, onDeleteT
                 <div style={{ fontSize: 12, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.description || "—"}</div>
                 <div style={{ fontSize: 10, color: T.textMuted, marginTop: 2, textTransform: "capitalize" }}>{t.category} · {fmtD(t.transaction_date)}</div>
               </div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: T.red, fontFamily: "'JetBrains Mono'", flexShrink: 0 }}>-{fmtS(t.amount)}</div>
+              {/* Exibe o valor de forma limpa na listagem de recentes */}
+              <div style={{ fontSize: 13, fontWeight: 600, color: T.red, fontFamily: "'JetBrains Mono'", flexShrink: 0 }}>-{fmtS(Math.abs(t.amount))}</div>
               <DeleteBtn tx={t} />
             </div>
           ))}
